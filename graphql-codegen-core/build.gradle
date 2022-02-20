@@ -19,24 +19,31 @@
 plugins {
     id 'java-library'
     id 'application'
+    id 'maven-publish'
 }
 
 
 dependencies {
-    implementation platform("com.netflix.graphql.dgs:graphql-dgs-platform-dependencies:latest.release")
+    implementation 'com.graphql-java:graphql-java:17.3'
+    implementation 'com.fasterxml.jackson.core:jackson-annotations:2.13.1'
+    implementation 'org.slf4j:slf4j-api:1.7.36'
 
-    implementation 'com.graphql-java:graphql-java'
-    implementation 'com.fasterxml.jackson.core:jackson-annotations'
-    implementation 'org.slf4j:slf4j-api'
+    implementation 'com.squareup:javapoet:1.13.0'
+    implementation 'com.squareup:kotlinpoet:1.10.2'
+    implementation 'com.github.ajalt.clikt:clikt:3.4.0'
 
-    implementation 'com.squareup:javapoet:1.13.+'
-    implementation 'com.squareup:kotlinpoet:1.10.+'
-    implementation 'com.github.ajalt.clikt:clikt:3.4.+'
-
-    testImplementation 'com.google.testing.compile:compile-testing:0.+'
+    testImplementation 'com.google.testing.compile:compile-testing:0.19'
     testImplementation 'org.jetbrains.kotlin:kotlin-compiler:1.5.31'
 }
 
 application {
     mainClassName = 'com.netflix.graphql.dgs.codegen.CodeGenCliKt'
+}
+
+publishing {
+    publications {
+        library(MavenPublication) {
+            from components.java
+        }
+    }
 }

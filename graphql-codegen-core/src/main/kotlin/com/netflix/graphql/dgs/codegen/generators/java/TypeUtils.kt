@@ -44,9 +44,7 @@ class TypeUtils(private val packageName: String, private val config: CodeGenConf
         "Currency" to ClassName.get(Currency::class.java),
         "Instant" to ClassName.get(Instant::class.java),
         "RelayPageInfo" to ClassName.get(PageInfo::class.java),
-        "PageInfo" to ClassName.get(PageInfo::class.java),
-        "PresignedUrlResponse" to ClassName.get("com.netflix.graphql.types.core.resolvers", "PresignedUrlResponse"),
-        "Header" to ClassName.get("com.netflix.graphql.types.core.resolvers", "PresignedUrlResponse", "Header")
+        "PageInfo" to ClassName.get(PageInfo::class.java)
     )
 
     fun qualifyName(name: String): String {

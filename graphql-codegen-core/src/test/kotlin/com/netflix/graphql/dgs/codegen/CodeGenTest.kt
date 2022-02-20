@@ -92,6 +92,87 @@ class CodeGenTest {
     }
 
     @Test
+    fun generateDataClassWithFetchAttribute() {
+        val schema = """
+            directive @fetch(batch: Boolean) on FIELD_DEFINITION
+            
+            type MyType {
+                id: String
+                a: String @fetch(batch: false)
+            }
+        """.trimIndent()
+
+        val (dataTypes) = CodeGen(
+                CodeGenConfig(
+                        schemas = setOf(schema),
+                        packageName = basePackageName,
+                )
+        ).generate()
+        val typeSpec = dataTypes[0].typeSpec
+        assertThat(typeSpec.fieldSpecs.size).isEqualTo(1)
+        assertThat(typeSpec.fieldSpecs[0].name).isEqualTo("id")
+    }
+
+    @Test
+    fun generateQueryApi() {
+        val schema = """
+            type Query {
+                personById(id: ID!): Person
+            }
+            
+            type Person {
+                firstname: String
+            }
+        """.trimIndent()
+
+        val res = CodeGen(
+                CodeGenConfig(
+                        schemas = setOf(schema),
+                        packageName = basePackageName,
+                )
+        ).generate()
+
+        assertThat(res.javaApis.size).isEqualTo(1)
+        res.javaApis[0].writeTo(System.out)
+        val typeSpec = res.javaApis[0].typeSpec
+        assertThat(typeSpec.name).isEqualTo("QueryApi")
+        assertThat(res.javaApis[0].packageName).isEqualTo(apisPackageName)
+
+        assertThat(typeSpec.methodSpecs.size).isEqualTo(1)
+        val method = typeSpec.methodSpecs[0]
+        assertThat(method.name).isEqualTo("personById")
+    }
+
+    @Test
+    fun generateTypeApi() {
+        val schema = """
+            directive @fetch(batch: Boolean) on FIELD_DEFINITION
+            
+            type MyType {
+                id: String
+                a: String @fetch(batch: false)
+                b: String @fetch(batch: true)
+                c: String @fetch
+            }
+        """.trimIndent()
+
+        val res = CodeGen(
+                CodeGenConfig(
+                        schemas = setOf(schema),
+                        packageName = basePackageName,
+                )
+        ).generate()
+
+        assertThat(res.javaApis.size).isEqualTo(1)
+        res.javaApis[0].writeTo(System.out)
+        val typeSpec = res.javaApis[0].typeSpec
+        assertThat(typeSpec.name).isEqualTo("MyTypeApi")
+        assertThat(res.javaApis[0].packageName).isEqualTo(apisPackageName)
+
+        assertThat(typeSpec.methodSpecs.size).isEqualTo(3)
+    }
+
+    @Test
     fun generateDataClassWithNonNullablePrimitive() {
         val schema = """
             type MyType {
@@ -801,7 +882,6 @@ class CodeGenTest {
 
     @Test
     fun generateDataFetcherClass() {
-
         val schema = """
             type Query {
                 people: [Person]
@@ -817,6 +897,7 @@ class CodeGenTest {
             CodeGenConfig(
                 schemas = setOf(schema),
                 packageName = basePackageName,
+                generateDataFetchers = true
             )
         ).generate()
         val dataFetchers = codeGenResult.javaDataFetchers

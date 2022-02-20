@@ -50,6 +50,9 @@ open class GenerateJavaTask : DefaultTask() {
     @Input
     var subPackageNameTypes = "types"
 
+    @Input
+    var subPackageNameApis = "apis"
+
     private val hasKotlinPluginWrapperClass = try {
         this.javaClass.classLoader.loadClass("org.jetbrains.kotlin.gradle.plugin.KotlinPluginWrapper")
         true
@@ -67,10 +70,13 @@ open class GenerateJavaTask : DefaultTask() {
     var generateBoxedTypes = false
 
     @Input
-    var generateClient = false
+    var generateDataTypes = true
 
     @Input
-    var generateDataTypes = true
+    var generateDataFetchers = false
+
+    @Input
+    var generateApis = true
 
     @Input
     var generateInterfaces = false
@@ -80,12 +86,12 @@ open class GenerateJavaTask : DefaultTask() {
 
     @OutputDirectory
     fun getOutputDir(): File {
-        return Paths.get("$generatedSourcesDir/generated/sources/dgs-codegen").toFile()
+        return Paths.get("$generatedSourcesDir/generated/sources/graphql-codegen").toFile()
     }
 
     @OutputDirectory
     fun getExampleOutputDir(): File {
-        return Paths.get("$generatedSourcesDir/generated/sources/dgs-codegen-generated-examples").toFile()
+        return Paths.get("$generatedSourcesDir/generated/sources/graphql-codegen-generated-examples").toFile()
     }
 
     @Input
@@ -136,10 +142,12 @@ open class GenerateJavaTask : DefaultTask() {
             subPackageNameClient = subPackageNameClient,
             subPackageNameDatafetchers = subPackageNameDatafetchers,
             subPackageNameTypes = subPackageNameTypes,
+            subPackageNameApis = subPackageNameApis,
             language = Language.valueOf(language.uppercase(Locale.getDefault())),
             generateBoxedTypes = generateBoxedTypes,
             generateInterfaces = generateInterfaces,
             generateInterfaceSetters = generateInterfaceSetters,
+            generateDataFetchers = generateDataFetchers,
             typeMapping = typeMapping,
             includeQueries = includeQueries.toSet(),
             includeMutations = includeMutations.toSet(),
@@ -147,6 +155,7 @@ open class GenerateJavaTask : DefaultTask() {
             skipEntityQueries = skipEntityQueries,
             shortProjectionNames = shortProjectionNames,
             generateDataTypes = generateDataTypes,
+            generateApis = generateApis,
             omitNullInputFields = omitNullInputFields,
             maxProjectionDepth = maxProjectionDepth,
             kotlinAllFieldsOptional = kotlinAllFieldsOptional,

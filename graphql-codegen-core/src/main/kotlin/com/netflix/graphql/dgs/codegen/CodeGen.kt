@@ -19,6 +19,7 @@
 package com.netflix.graphql.dgs.codegen
 
 import com.netflix.graphql.dgs.codegen.generators.java.*
+import com.netflix.graphql.dgs.codegen.generators.java.spring.ApiGenerator
 import com.netflix.graphql.dgs.codegen.generators.kotlin.*
 import com.netflix.graphql.dgs.codegen.generators.shared.SchemaExtensionsUtils.findEnumExtensions
 import com.netflix.graphql.dgs.codegen.generators.shared.SchemaExtensionsUtils.findInputExtensions
@@ -62,6 +63,7 @@ class CodeGen(private val config: CodeGenConfig) {
             codeGenResult.javaEnumTypes.forEach { it.writeTo(config.outputDir) }
             codeGenResult.javaDataFetchers.forEach { it.writeTo(config.examplesOutputDir) }
             codeGenResult.javaQueryTypes.forEach { it.writeTo(config.outputDir) }
+            codeGenResult.javaApis.forEach { it.writeTo(config.outputDir) }
             codeGenResult.clientProjections.forEach {
                 try {
                     it.writeTo(config.outputDir)
@@ -105,6 +107,7 @@ class CodeGen(private val config: CodeGenConfig) {
         val constantsClass = ConstantsGenerator(config, document).generate()
         // Data Fetchers
         val dataFetchersResult = generateJavaDataFetchers(definitions)
+        val apisResult = generateJavaApis(definitions)
 
         return dataTypesResult
             .merge(dataFetchersResult)
@@ -113,6 +116,7 @@ class CodeGen(private val config: CodeGenConfig) {
             .merge(enumsResult)
             .merge(interfacesResult)
             .merge(constantsClass)
+            .merge(apisResult)
     }
 
     private fun generateJavaEnums(definitions: Collection<Definition<*>>): CodeGenResult {
@@ -153,9 +157,17 @@ class CodeGen(private val config: CodeGenConfig) {
     private fun generateJavaDataFetchers(definitions: Collection<Definition<*>>): CodeGenResult {
         return definitions.asSequence()
             .filterIsInstance<ObjectTypeDefinition>()
-            .filter { it.name == "Query" }
+            .filter { config.generateDataFetchers && it.name == "Query" }
             .map { DatafetcherGenerator(config, document).generate(it) }
             .fold(CodeGenResult()) { t: CodeGenResult, u: CodeGenResult -> t.merge(u) }
+    }
+
+    private fun generateJavaApis(definitions: Collection<Definition<*>>): CodeGenResult {
+        return definitions.asSequence()
+                .filter { config.generateApis }
+                .filterIsInstance<ObjectTypeDefinition>()
+                .map { ApiGenerator(config, document).generate(it) }
+                .fold(CodeGenResult()) { t: CodeGenResult, u: CodeGenResult -> t.merge(u) }
     }
 
     private fun generateJavaDataType(definitions: Collection<Definition<*>>): CodeGenResult {
@@ -264,6 +276,7 @@ data class CodeGenConfig(
     private val subPackageNameClient: String = "client",
     private val subPackageNameDatafetchers: String = "datafetchers",
     private val subPackageNameTypes: String = "types",
+    private val subPackageNameApis: String = "apis",
     val language: Language = Language.JAVA,
     val generateBoxedTypes: Boolean = false,
     val generateInterfaces: Boolean = false,
@@ -274,12 +287,14 @@ data class CodeGenConfig(
     val skipEntityQueries: Boolean = false,
     val shortProjectionNames: Boolean = false,
     val generateDataTypes: Boolean = true,
+    val generateApis: Boolean = true,
     val omitNullInputFields: Boolean = false,
     val maxProjectionDepth: Int = 10,
     val kotlinAllFieldsOptional: Boolean = false,
     /** If enabled, the names of the classes available via the DgsConstant class will be snake cased.*/
     val snakeCaseConstantNames: Boolean = false,
     val generateInterfaceSetters: Boolean = true,
+    val generateDataFetchers: Boolean = false,
 ) {
     val packageNameClient: String
         get() = "$packageName.$subPackageNameClient"
@@ -289,6 +304,9 @@ data class CodeGenConfig(
 
     val packageNameTypes: String
         get() = "$packageName.$subPackageNameTypes"
+
+    val packageNameApis: String
+        get() = "$packageName.$subPackageNameApis"
 
     override fun toString(): String {
         return """
@@ -322,8 +340,11 @@ data class CodeGenResult(
     val javaEnumTypes: List<JavaFile> = listOf(),
     val javaDataFetchers: List<JavaFile> = listOf(),
     val javaQueryTypes: List<JavaFile> = listOf(),
-    val clientProjections: List<JavaFile> = listOf(),
     val javaConstants: List<JavaFile> = listOf(),
+    val javaApis: List<JavaFile> = listOf(),
+
+    val clientProjections: List<JavaFile> = listOf(),
+
     val kotlinDataTypes: List<FileSpec> = listOf(),
     val kotlinInterfaces: List<FileSpec> = listOf(),
     val kotlinEnumTypes: List<FileSpec> = listOf(),
@@ -338,6 +359,7 @@ data class CodeGenResult(
         val javaQueryTypes = this.javaQueryTypes.plus(current.javaQueryTypes)
         val clientProjections = this.clientProjections.plus(current.clientProjections)
         val javaConstants = this.javaConstants.plus(current.javaConstants)
+        val javaApis = this.javaApis.plus(current.javaApis)
         val kotlinDataTypes = this.kotlinDataTypes.plus(current.kotlinDataTypes)
         val kotlinInterfaces = this.kotlinInterfaces.plus(current.kotlinInterfaces)
         val kotlinEnumTypes = this.kotlinEnumTypes.plus(current.kotlinEnumTypes)
@@ -352,6 +374,7 @@ data class CodeGenResult(
             javaQueryTypes = javaQueryTypes,
             clientProjections = clientProjections,
             javaConstants = javaConstants,
+            javaApis = javaApis,
             kotlinDataTypes = kotlinDataTypes,
             kotlinInterfaces = kotlinInterfaces,
             kotlinEnumTypes = kotlinEnumTypes,
@@ -369,6 +392,7 @@ data class CodeGenResult(
             .plus(javaQueryTypes)
             .plus(clientProjections)
             .plus(javaConstants)
+            .plus(javaApis)
             .toList()
     }
 
@@ -383,7 +407,15 @@ data class CodeGenResult(
 }
 
 fun List<FieldDefinition>.filterSkipped(): List<FieldDefinition> {
-    return this.filter { it.directives.none { d -> d.name == "skipcodegen" } }
+    return this.filter { it.directives.none { d -> d.name == "skipcodegen" || d.name == "fetch" } }
+}
+
+fun List<FieldDefinition>.filterFetchFields(): List<FieldDefinition> {
+    return this.filter {
+        it.directives.none { d -> d.name == "skipcodegen" }
+        &&
+        it.directives.any { d -> d.name == "fetch" }
+    }
 }
 
 fun List<FieldDefinition>.filterIncludedInConfig(definitionName: String, config: CodeGenConfig): List<FieldDefinition> {
